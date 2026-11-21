@@ -36,6 +36,7 @@ const uint8_t SFX_EAT[]     PROGMEM = { E5,1, C6,1, END };
 const uint8_t SFX_GOLD[]    PROGMEM = { G5,1, REST,1, G5,1, END };
 const uint8_t SFX_POWERUP[] PROGMEM = { C5,1, E5,1, G5,1, C6,1, E6,2, END };
 const uint8_t SFX_OVER[]    PROGMEM = { C5,3, G4,3, E4,3, C4,6, END };
+const uint8_t SFX_CRASH[]   PROGMEM = { E5,2, C5,2, G4,4, END };
 const uint8_t SFX_WIN[]     PROGMEM = { C5,2, E5,2, G5,2, C6,6, END };
 
 #define SFX_STEP_MS 40

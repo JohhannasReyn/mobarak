@@ -4,21 +4,24 @@
 
 // What the status bar shows, so it can be drawn again after a pause
 static uint16_t hud_score = 0, hud_hi = 0;
-static uint8_t hud_gold = 0;
+static uint8_t hud_gold = 0, hud_lives = 0;
 
 static void draw_hud() {
     tft_fill_rect(0, 0, TFT_W, HUD_H - 2, C_BLACK);
     tft_fill_rect(0, HUD_H - 2, TFT_W, 2, C_GRAY);
     tft_text_P(8, HUD_TEXT_Y, PSTR("SCORE:"), C_WHITE, C_BLACK, 2);
     tft_number(HUD_SCORE_X, HUD_TEXT_Y, hud_score, 5, C_WHITE, C_BLACK, 2);
-    tft_text_P(352, HUD_TEXT_Y, PSTR("HI:"), C_WHITE, C_BLACK, 2);
+    tft_text_P(158, HUD_TEXT_Y, PSTR("LIVES:"), C_WHITE, C_BLACK, 2);
+    tft_number(HUD_LIVES_X, HUD_TEXT_Y, hud_lives, 1, C_WHITE, C_BLACK, 2);
+    tft_text_P(356, HUD_TEXT_Y, PSTR("HI:"), C_WHITE, C_BLACK, 2);
     tft_number(HUD_HI_X, HUD_TEXT_Y, hud_hi, 5, C_WHITE, C_BLACK, 2);
     if (hud_gold) ui_hud_gold(hud_gold);
 }
 
-void ui_hud(uint16_t score, uint16_t hi) {
+void ui_hud(uint16_t score, uint16_t hi, uint8_t lives) {
     hud_score = score;
     hud_hi = hi;
+    hud_lives = lives;
     hud_gold = 0;
     draw_hud();
 }
@@ -26,6 +29,11 @@ void ui_hud(uint16_t score, uint16_t hi) {
 void ui_hud_score(uint16_t score) {
     hud_score = score;
     tft_number(HUD_SCORE_X, HUD_TEXT_Y, score, 5, C_WHITE, C_BLACK, 2);
+}
+
+void ui_hud_lives(uint8_t lives) {
+    hud_lives = lives;
+    tft_number(HUD_LIVES_X, HUD_TEXT_Y, lives, 1, C_WHITE, C_BLACK, 2);
 }
 
 void ui_hud_gold(uint8_t seconds) {

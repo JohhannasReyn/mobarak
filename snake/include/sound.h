@@ -16,6 +16,7 @@ extern const uint8_t SFX_EAT[] PROGMEM;
 extern const uint8_t SFX_GOLD[] PROGMEM;
 extern const uint8_t SFX_POWERUP[] PROGMEM;
 extern const uint8_t SFX_OVER[] PROGMEM;
+extern const uint8_t SFX_CRASH[] PROGMEM;   // a life lost
 extern const uint8_t SFX_WIN[] PROGMEM;
 
 void sound_init();

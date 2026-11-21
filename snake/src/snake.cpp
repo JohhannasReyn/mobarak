@@ -29,6 +29,8 @@
 #define GOLD_LIFE   800              // golden apple stays 8 s
 #define OVER_GUARD  50               // stick presses ignored for 500 ms after game over
 #define POWER_TIME  1000             // golden mode lasts 10 s
+#define START_LIVES 3
+#define CRASH_TIME  100              // the snake stays crashed on screen for 1 s
 
 #define C_BODY    RGB565(  0, 170,   0)
 #define C_HEAD    RGB565(120, 255, 120)
@@ -36,6 +38,7 @@
 #define C_GHEAD   RGB565(255, 200,  80)
 #define C_APPLE   RGB565(230,   0,   0)
 #define C_GAPPLE  RGB565(255, 230,   0)
+#define C_CRASH   RGB565(255,   0,   0)    // the head after a crash
 
 SnakeData S;
 uint8_t snake_over = 0;
@@ -95,23 +98,37 @@ static uint8_t place(uint8_t what, uint8_t *ox, uint8_t *oy) {
 
 static void set_tempo() { sound_tempo(S.step_ticks * 7); }    // music speeds up with the snake
 
+// A new snake: three segments left of center, heading right. Used at the
+// start of a game and after each lost life. An apple sitting where the
+// snake appears is moved somewhere else.
+static void spawn_snake() {
+    S.ty = S.hy = SN_ROWS / 2;
+    S.tx = 5;
+    S.hx = S.tx + START_LEN - 1;
+    uint8_t apple_lost = 0;
+    for (uint8_t x = S.tx; x <= S.hx; x++) {
+        if (S.grid[S.hy][x] == FOOD) apple_lost = 1;
+        S.grid[S.hy][x] = DIR_RIGHT;               // a golden apple there is simply gone
+    }
+    S.length = START_LEN;
+    S.grow = 0;
+    S.dir = S.next_dir = DIR_RIGHT;
+    S.step_count = 0;
+    repaint_snake();
+    uint8_t fx, fy;
+    if (apple_lost) place(FOOD, &fx, &fy);
+}
+
 static void start() {
     memset(&S, 0, sizeof S);
     input_clear();                 // stick wiggles on the game-over screen don't steer the new game
     snake_over = 0;
-    ui_hud(0, score_get(GAME_SNAKE, 0));
+    S.lives = START_LIVES;
+    ui_hud(0, score_get(GAME_SNAKE, 0), S.lives);
     tft_fill_rect(0, FIELD_Y, TFT_W, TFT_H - FIELD_Y, C_BLACK);
 
-    // Three segments left of center, heading right
-    S.ty = S.hy = SN_ROWS / 2;
-    S.tx = 5;
-    S.hx = S.tx + START_LEN - 1;
-    for (uint8_t x = S.tx; x <= S.hx; x++) S.grid[S.hy][x] = DIR_RIGHT;
-    S.length = START_LEN;
-    S.dir = S.next_dir = DIR_RIGHT;
     S.step_ticks = START_STEP;
-    repaint_snake();
-
+    spawn_snake();
     uint8_t fx, fy;
     place(FOOD, &fx, &fy);
     sound_music(SONG_SNAKE);
@@ -127,6 +144,37 @@ static int finish(uint8_t won) {
     over_guard = OVER_GUARD;       // and neither can one from the moment of the crash
     snake_over = 1;
     return SN_OVER;
+}
+
+// A crash costs a life. The last life ends the game; otherwise the snake
+// freezes for a second with a red head, then respawn() starts it over.
+static int crash() {
+    S.lives--;
+    if (S.lives == 0) return finish(0);
+    ui_hud_lives(S.lives);
+    tft_fill_rect(px(S.hx) + 1, py(S.hy) + 1, CELL - 2, CELL - 2, C_CRASH);
+    sound_music(0);
+    sound_sfx(SFX_CRASH);
+    S.crash_timer = CRASH_TIME;
+    return SN_CRASH;
+}
+
+// After the crash pause: erase the old snake, end golden mode, new snake.
+// Score, speed and the apples on the board stay as they were.
+static void respawn() {
+    uint8_t x = S.tx, y = S.ty;                    // walk tail to head, clearing
+    for (uint16_t i = 0; i < S.length; i++) {
+        const uint8_t d = S.grid[y][x];
+        S.grid[y][x] = EMPTY;
+        draw_empty(x, y);
+        x = (x + DX[d] + SN_COLS) % SN_COLS;
+        y = (y + DY[d] + SN_ROWS) % SN_ROWS;
+    }
+    if (golden()) { S.power_timer = 0; ui_hud_gold(0); }
+    spawn_snake();
+    input_clear();                 // a flick made during the crash doesn't steer the new snake
+    sound_music(SONG_SNAKE);
+    set_tempo();
 }
 
 // Steering: a direction event (a fresh flick) or the held direction.
@@ -148,7 +196,7 @@ static int step() {
     int8_t nx = S.hx + DX[S.dir];
     int8_t ny = S.hy + DY[S.dir];
     if (nx < 0 || nx >= SN_COLS || ny < 0 || ny >= SN_ROWS) {
-        if (!golden()) return finish(0);                  // wall
+        if (!golden()) return crash();                    // wall
         nx = (nx + SN_COLS) % SN_COLS;                    // golden mode: wrap around
         ny = (ny + SN_ROWS) % SN_ROWS;
     }
@@ -156,7 +204,7 @@ static int step() {
     const uint8_t target = S.grid[ny][nx];
     if (target >= DIR_UP && target <= DIR_RIGHT) {
         // Only the tail cell is safe, and only if the tail is about to move
-        if (!(nx == S.tx && ny == S.ty && S.grow == 0)) return finish(0);
+        if (!(nx == S.tx && ny == S.ty && S.grow == 0)) return crash();
     }
 
     if (target == FOOD) {
@@ -259,6 +307,13 @@ int TickFct_Snake(int state) {
             if (++S.step_count >= S.step_ticks) {
                 S.step_count = 0;
                 state = step();
+            }
+            break;
+        case SN_CRASH:
+            if (sys_paused) break;
+            if (--S.crash_timer == 0) {
+                respawn();
+                state = SN_PLAY;
             }
             break;
         case SN_OVER:
