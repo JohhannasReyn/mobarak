@@ -61,10 +61,13 @@ static uint8_t  s_note = 0;
 static uint16_t s_len = 0;
 static uint8_t  tempo = 100;
 static uint8_t  muted = 0, paused = 0;
+static uint8_t  music_on = 1;        // the title menu's MUSIC setting
 static uint8_t  playing_note = 0;    // note on the buzzer right now
 static uint16_t playing_hz = 0;
 
-void sound_music(const uint8_t *song) { music = song; mpos = song; m_left = 0; }
+void sound_music(const uint8_t *song) { music = music_on ? song : 0; mpos = music; m_left = 0; }
+void sound_music_enable(uint8_t on) { music_on = on; if (!on) { music = 0; mpos = 0; } }
+uint8_t sound_music_enabled() { return music_on; }
 void sound_sfx(const uint8_t *effect) { sfx = effect; s_left = 0; }
 void sound_tempo(uint8_t ms) { tempo = ms < 30 ? 30 : ms; }
 void sound_set_mute(uint8_t on) { muted = on; }

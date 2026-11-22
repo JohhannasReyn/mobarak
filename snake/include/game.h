@@ -30,15 +30,15 @@ struct SnakeData {
     uint16_t score;
     uint8_t  eaten;
     uint8_t  gx, gy;                   // golden apple cell
-    uint8_t  lives;          // the game ends when the last one is lost
-    uint8_t  crash_timer;    // ticks left of the pause after a crash
     uint16_t gold_timer;               // ticks the golden apple stays (0 = none on the board)
     uint16_t power_timer;              // ticks of golden mode left
+    uint8_t  lives;                    // the game ends when the last one is lost
+    uint8_t  crash_timer;              // ticks left of the pause after a crash
 };
 extern SnakeData S;
 
 // ---- Task tick functions and their states ----
-enum System_States { SYS_INIT, SYS_TITLE, SYS_PLAY, SYS_PAUSE };
+enum System_States { SYS_INIT, SYS_TITLE, SYS_PLAY, SYS_PAUSE, SYS_TOUCH_TEST };
 enum Snake_States  { SN_OFF, SN_PLAY, SN_CRASH, SN_OVER };
 
 int TickFct_System(int state);

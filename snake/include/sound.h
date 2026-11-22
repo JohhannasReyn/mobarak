@@ -21,6 +21,8 @@ extern const uint8_t SFX_WIN[] PROGMEM;
 
 void sound_init();
 void sound_music(const uint8_t *song);   // 0 stops the music
+void sound_music_enable(uint8_t on);     // 0: songs stay silent, effects still play
+uint8_t sound_music_enabled();
 void sound_sfx(const uint8_t *effect);
 void sound_tempo(uint8_t ms_per_step);   // music speed; games raise it as play speeds up
 void sound_set_mute(uint8_t on);

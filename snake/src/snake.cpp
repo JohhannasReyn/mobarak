@@ -13,7 +13,9 @@
 //   Every 5th apple brings a golden apple for 8 s. Eating it starts
 //   golden mode for 10 s: the snake turns orange, the walls wrap around
 //   and apples score double.
-//   Hitting a wall (outside golden mode) or yourself ends the game.
+//   Hitting a wall (outside golden mode) or yourself costs a life: the
+//   snake stops for a second, then starts over from the left (the score
+//   stays). Losing the third life ends the game.
 //   Reach length 100 to win.
 // =====================================================================
 
@@ -28,9 +30,9 @@
 #define GOLD_EVERY  5                // a golden apple after every 5th apple
 #define GOLD_LIFE   800              // golden apple stays 8 s
 #define OVER_GUARD  50               // stick presses ignored for 500 ms after game over
-#define POWER_TIME  1000             // golden mode lasts 10 s
 #define START_LIVES 3
 #define CRASH_TIME  100              // the snake stays crashed on screen for 1 s
+#define POWER_TIME  1000             // golden mode lasts 10 s
 
 #define C_BODY    RGB565(  0, 170,   0)
 #define C_HEAD    RGB565(120, 255, 120)
@@ -177,9 +179,30 @@ static void respawn() {
     set_tempo();
 }
 
-// Steering: a direction event (a fresh flick) or the held direction.
-// Reversing straight into your own neck is ignored.
+// A tap on the field turns the snake toward it: above or below the head
+// while it moves sideways, left or right of it while it moves up or down.
+// A tap in line with the head changes nothing.
+static uint8_t tap_direction() {
+    const int16_t dx = in_tap_x - (px(S.hx) + CELL / 2);
+    const int16_t dy = in_tap_y - (py(S.hy) + CELL / 2);
+    if (S.dir == DIR_LEFT || S.dir == DIR_RIGHT) {
+        if (dy < -CELL / 2) return DIR_UP;
+        if (dy >  CELL / 2) return DIR_DOWN;
+    } else {
+        if (dx < -CELL / 2) return DIR_LEFT;
+        if (dx >  CELL / 2) return DIR_RIGHT;
+    }
+    return DIR_NONE;
+}
+
+// Steering: a tap on the field, a direction event (a fresh flick) or the
+// held direction. Reversing straight into your own neck is ignored.
 static void read_steering() {
+    if (input_take_tap(0, FIELD_Y, TFT_W, TFT_H)) {
+        const uint8_t t = tap_direction();
+        if (t != DIR_NONE) S.next_dir = t;     // a tap is always a 90-degree turn
+        return;
+    }
     uint8_t want = DIR_NONE;
     const uint8_t ev = input_take(EV_DIRS);
     if      (ev & EV_UP)    want = DIR_UP;
@@ -285,8 +308,10 @@ static void tick_timers() {
 // =====================================================================
 // Snake task, period 10 ms
 //   SN_OFF  --(System sets snake_restart)--> SN_PLAY (draw a fresh game)
-//   SN_PLAY --(wall / self)--> SN_OVER      --(length 100)--> SN_OVER (win)
-//   SN_OVER --(stick press, once the box has been up 0.5 s)--> SN_PLAY
+//   SN_PLAY --(wall / self, lives left)--> SN_CRASH
+//           --(wall / self, last life)--> SN_OVER   --(length 100)--> SN_OVER (win)
+//   SN_CRASH --(1 s later: new snake)--> SN_PLAY
+//   SN_OVER --(stick press or tap, once the box has been up 0.5 s)--> SN_PLAY
 //   any     --(System sets snake_restart: RESET button)--> SN_PLAY
 //   any     --(System goes back to the title screen)--> SN_OFF
 // =====================================================================
@@ -319,8 +344,8 @@ int TickFct_Snake(int state) {
         case SN_OVER:
             if (over_guard > 0) {
                 over_guard--;
-                input_take(EV_SW);         // too soon: throw the press away
-            } else if (input_take(EV_SW)) {
+                input_take(EV_SW | EV_TAP);   // too soon: throw the press away
+            } else if (input_take(EV_SW | EV_TAP)) {
                 start();
                 state = SN_PLAY;
             }

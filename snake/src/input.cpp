@@ -3,10 +3,14 @@
 #include "adc.h"
 #include "rng.h"
 #include "timer.h"
+#include "touch.h"
 #include <avr/io.h>
 
 uint16_t in_joy_x = 512, in_joy_y = 512;
 uint8_t  in_dir = DIR_NONE;
+uint8_t  in_touch = 0;
+int16_t  in_touch_x = 0, in_touch_y = 0;
+int16_t  in_tap_x = 0, in_tap_y = 0;
 static uint8_t events = 0;
 
 #define BTN_MASK ((1 << BTN_RESET) | (1 << BTN_SW))
@@ -26,8 +30,19 @@ uint8_t input_take(uint8_t mask) {
     return got;
 }
 
+uint8_t input_take_tap(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
+    if (!(events & EV_TAP)) return 0;
+    if (in_tap_x < x0 || in_tap_x >= x1 || in_tap_y < y0 || in_tap_y >= y1) return 0;
+    events &= ~EV_TAP;
+    return 1;
+}
+
 void input_clear() {
     events = 0;
+}
+
+uint8_t input_sw_down() {
+    return !(PINC & (1 << BTN_SW));
 }
 
 // Dominant axis wins. Hysteresis keeps a held direction from flickering:
@@ -50,12 +65,16 @@ static uint8_t joystick_direction(int16_t dx, int16_t dy, uint8_t current) {
 // =====================================================================
 // Input task, period 20 ms
 //   IN_INIT --> IN_SAMPLE --> IN_SAMPLE ...
-//   Reads the joystick, debounces the two buttons (a button must
-//   read the same on two samples in a row), and raises press events.
+//   Reads the joystick and the touch screen, debounces the two buttons and
+//   the touch (each must read the same on two samples in a row), and raises
+//   press and tap events.
 // =====================================================================
 int TickFct_Input(int state) {
     static uint8_t stable = 0;     // debounced buttons, 1 = pressed
     static uint8_t last_raw = 0;
+#if TOUCH_ENABLED
+    static uint8_t touch_last = 0; // touch on the previous sample
+#endif
 
     switch (state) {
         case IN_INIT:   state = IN_SAMPLE; break;
@@ -93,6 +112,21 @@ int TickFct_Input(int state) {
         stable = now;
         if (pressed & (1 << BTN_RESET)) events |= EV_RESET;
         if (pressed & (1 << BTN_SW))    events |= EV_SW;
+
+#if TOUCH_ENABLED
+        int16_t tx, ty;
+        const uint8_t touched = touch_read(&tx, &ty);
+        if (touched) { in_touch_x = tx; in_touch_y = ty; }
+        if (touched && touch_last && !in_touch) {         // pressed on two samples: a tap
+            in_touch = 1;
+            in_tap_x = tx;
+            in_tap_y = ty;
+            events |= EV_TAP;
+        } else if (!touched && !touch_last) {             // released on two samples
+            in_touch = 0;
+        }
+        touch_last = touched;
+#endif
     }
     return state;
 }

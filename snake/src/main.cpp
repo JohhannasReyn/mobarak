@@ -1,8 +1,9 @@
 /*
- * Snake on a 4.0" 480x320 SPI TFT for UNO R3 (ATmega328P)
+ * Snake on a 4.0" 480x320 SPI TFT for the Elegoo UNO R3 (ATmega328P)
+ * Concurrent SynchSM, bare-metal AVR (no Arduino API)
  *
  * Tasks (GCD period 10 ms)
- *   1  Input    20 ms  joystick direction, debounced RESET and stick-press buttons
+ *   1  Input    20 ms  joystick direction, touch screen taps, debounced RESET and stick-press buttons
  *   2  System   20 ms  title screen, soft reset, pause
  *   3  Snake    10 ms  the game: movement, apples, golden mode, scoring; draws on the TFT
  *   4  Sound    10 ms  background music and sound effects on the buzzer
@@ -23,6 +24,8 @@
 #include <avr/interrupt.h>
 #include "timer.h"
 #include "tft.h"
+#include "touch.h"
+#include "config.h"
 #include "adc.h"
 #include "input.h"
 #include "sound.h"
@@ -66,6 +69,9 @@ static void add_task(unsigned char i, signed char state, unsigned long period, i
 }
 
 void system_setup() {
+#if TOUCH_ENABLED
+    touch_init();                // first: its chip select must be high (off) before
+#endif                           // the screen starts talking on the shared SPI bus
     tft_init();                  // also sets up SPI
     adc_init();
     input_init();

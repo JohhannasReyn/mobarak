@@ -50,7 +50,7 @@ void ui_pause_banner(uint8_t on) {
     if (!on) { draw_hud(); return; }
     tft_fill_rect(0, 0, TFT_W, HUD_H - 2, C_BLACK);
     tft_text_P(8, HUD_TEXT_Y, PSTR("PAUSED"), C_YELLOW, C_BLACK, 2);
-    tft_text_P(290, HUD_TEXT_Y, PSTR("CLICK TO RESUME"), C_GRAY, C_BLACK, 2);
+    tft_text_P(210, HUD_TEXT_Y, PSTR("CLICK OR TAP TO RESUME"), C_GRAY, C_BLACK, 2);
 }
 
 void ui_game_over(uint8_t won, uint16_t score, int8_t rank) {
@@ -63,5 +63,5 @@ void ui_game_over(uint8_t won, uint16_t score, int8_t rank) {
     tft_number(GO_SCORE_X, GO_Y + 64, score, 5, C_WHITE, C_BLACK, 2);
     if (rank == 0)     tft_text_center_P(GO_Y + 88, PSTR("NEW HIGH SCORE!"), C_YELLOW, C_BLACK, 2);
     else if (rank > 0) tft_text_center_P(GO_Y + 88, PSTR("TOP 3 SCORE!"), C_YELLOW, C_BLACK, 2);
-    tft_text_center_P(GO_Y + 112, PSTR("PRESS STICK"), C_GRAY, C_BLACK, 2);
+    tft_text_center_P(GO_Y + 112, PSTR("PRESS STICK OR TAP"), C_GRAY, C_BLACK, 2);
 }
