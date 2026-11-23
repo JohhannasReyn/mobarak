@@ -2,9 +2,24 @@
 #include "game.h"
 #include <avr/pgmspace.h>
 
+#define C_STAR_TEXT RGB565(255, 80, 255)
+
 // What the status bar shows, so it can be drawn again after a pause
 static uint16_t hud_score = 0, hud_hi = 0;
-static uint8_t hud_gold = 0, hud_lives = 0;
+static uint8_t hud_gold = 0, hud_star = 0, hud_lives = 0;
+
+// The power slot: star power's seconds while it lasts, else golden mode's
+static void draw_power() {
+    if (hud_star) {
+        tft_text_P(HUD_GOLD_X, HUD_TEXT_Y, PSTR("STAR"), C_STAR_TEXT, C_BLACK, 2);
+        tft_number(HUD_GOLD_X + 60, HUD_TEXT_Y, hud_star, 2, C_STAR_TEXT, C_BLACK, 2);
+    } else if (hud_gold) {
+        tft_text_P(HUD_GOLD_X, HUD_TEXT_Y, PSTR("GOLD"), C_YELLOW, C_BLACK, 2);
+        tft_number(HUD_GOLD_X + 60, HUD_TEXT_Y, hud_gold, 2, C_YELLOW, C_BLACK, 2);
+    } else {
+        tft_fill_rect(HUD_GOLD_X, HUD_TEXT_Y, 7 * 12, 16, C_BLACK);
+    }
+}
 
 static void draw_hud() {
     tft_fill_rect(0, 0, TFT_W, HUD_H - 2, C_BLACK);
@@ -15,7 +30,7 @@ static void draw_hud() {
     tft_number(HUD_LIVES_X, HUD_TEXT_Y, hud_lives, 1, C_WHITE, C_BLACK, 2);
     tft_text_P(356, HUD_TEXT_Y, PSTR("HI:"), C_WHITE, C_BLACK, 2);
     tft_number(HUD_HI_X, HUD_TEXT_Y, hud_hi, 5, C_WHITE, C_BLACK, 2);
-    if (hud_gold) ui_hud_gold(hud_gold);
+    if (hud_gold || hud_star) draw_power();
 }
 
 void ui_hud(uint16_t score, uint16_t hi, uint8_t lives) {
@@ -23,6 +38,7 @@ void ui_hud(uint16_t score, uint16_t hi, uint8_t lives) {
     hud_hi = hi;
     hud_lives = lives;
     hud_gold = 0;
+    hud_star = 0;
     draw_hud();
 }
 
@@ -38,12 +54,12 @@ void ui_hud_lives(uint8_t lives) {
 
 void ui_hud_gold(uint8_t seconds) {
     hud_gold = seconds;
-    if (seconds) {
-        tft_text_P(HUD_GOLD_X, HUD_TEXT_Y, PSTR("GOLD"), C_YELLOW, C_BLACK, 2);
-        tft_number(HUD_GOLD_X + 60, HUD_TEXT_Y, seconds, 2, C_YELLOW, C_BLACK, 2);
-    } else {
-        tft_fill_rect(HUD_GOLD_X, HUD_TEXT_Y, 7 * 12, 16, C_BLACK);
-    }
+    draw_power();
+}
+
+void ui_hud_star(uint8_t seconds) {
+    hud_star = seconds;
+    draw_power();
 }
 
 void ui_pause_banner(uint8_t on) {
@@ -63,5 +79,5 @@ void ui_game_over(uint8_t won, uint16_t score, int8_t rank) {
     tft_number(GO_SCORE_X, GO_Y + 64, score, 5, C_WHITE, C_BLACK, 2);
     if (rank == 0)     tft_text_center_P(GO_Y + 88, PSTR("NEW HIGH SCORE!"), C_YELLOW, C_BLACK, 2);
     else if (rank > 0) tft_text_center_P(GO_Y + 88, PSTR("TOP 3 SCORE!"), C_YELLOW, C_BLACK, 2);
-    tft_text_center_P(GO_Y + 112, PSTR("PRESS STICK OR TAP"), C_GRAY, C_BLACK, 2);
+    tft_text_center_P(GO_Y + 112, PSTR("STICK OR TAP: MENU"), C_GRAY, C_BLACK, 2);
 }

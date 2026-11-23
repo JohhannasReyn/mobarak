@@ -187,6 +187,17 @@ void tft_fill_rect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
     CS_HIGH();
 }
 
+void tft_sprite_P(int16_t x, int16_t y, uint8_t w, uint8_t h, const char *art, const uint16_t *palette, uint16_t bg) {
+    if (x < 0 || y < 0 || x + w > TFT_W || y + h > TFT_H) return;
+    CS_LOW();
+    set_window(x, y, x + w - 1, y + h - 1);
+    for (uint16_t i = 0; i < (uint16_t)w * h; i++) {
+        const char c = pgm_read_byte(art + i);
+        push(px_bytes(c == '.' ? bg : palette[c - '1']));
+    }
+    CS_HIGH();
+}
+
 void tft_frame(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t t, uint16_t color) {
     tft_fill_rect(x, y, w, t, color);
     tft_fill_rect(x, y + h - t, w, t, color);

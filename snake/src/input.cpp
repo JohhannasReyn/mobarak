@@ -52,13 +52,13 @@ static uint8_t joystick_direction(int16_t dx, int16_t dy, uint8_t current) {
     const int16_t ax = dx < 0 ? -dx : dx;
     const int16_t ay = dy < 0 ? -dy : dy;
     const int16_t m  = ax > ay ? ax : ay;
-    const uint8_t horizontal = dx < 0 ? DIR_LEFT : DIR_RIGHT;
-    const uint8_t vertical   = dy < 0 ? DIR_UP : DIR_DOWN;
+    const uint8_t horizontal = dx < 0 ? DIR_WEST : DIR_EAST;
+    const uint8_t vertical   = dy < 0 ? DIR_NORTH : DIR_SOUTH;
 
     if (m < JOY_EXIT) return DIR_NONE;
     if (m < JOY_ENTER && current == DIR_NONE) return DIR_NONE;
-    if ((current == DIR_LEFT || current == DIR_RIGHT) && ax + 100 >= ay) return horizontal;
-    if ((current == DIR_UP || current == DIR_DOWN) && ay + 100 >= ax) return vertical;
+    if ((current == DIR_WEST || current == DIR_EAST) && ax + 100 >= ay) return horizontal;
+    if ((current == DIR_NORTH || current == DIR_SOUTH) && ay + 100 >= ax) return vertical;
     return ax > ay ? horizontal : vertical;
 }
 
@@ -77,7 +77,10 @@ int TickFct_Input(int state) {
 #endif
 
     switch (state) {
-        case IN_INIT:   state = IN_SAMPLE; break;
+        case IN_INIT:                  // a button already held at power-up isn't a press
+            last_raw = stable = ~PINC & BTN_MASK;
+            state = IN_SAMPLE;
+            break;
         case IN_SAMPLE: break;
         default:        state = IN_INIT; break;
     }
@@ -96,10 +99,10 @@ int TickFct_Input(int state) {
         in_dir = joystick_direction((int16_t)x - 512, (int16_t)y - 512, in_dir);
         if (in_dir != prev_dir) {
             switch (in_dir) {
-                case DIR_UP:    events |= EV_UP;    break;
-                case DIR_DOWN:  events |= EV_DOWN;  break;
-                case DIR_LEFT:  events |= EV_LEFT;  break;
-                case DIR_RIGHT: events |= EV_RIGHT; break;
+                case DIR_NORTH:    events |= EV_UP;    break;
+                case DIR_SOUTH:  events |= EV_DOWN;  break;
+                case DIR_WEST:  events |= EV_LEFT;  break;
+                case DIR_EAST: events |= EV_RIGHT; break;
                 default: break;
             }
         }

@@ -4,14 +4,14 @@
  *
  * Tasks (GCD period 10 ms)
  *   1  Input    20 ms  joystick direction, touch screen taps, debounced RESET and stick-press buttons
- *   2  System   20 ms  title screen, soft reset, pause
+ *   2  System   20 ms  title menu, high scores, touch setup, pause, game over, soft reset
  *   3  Snake    10 ms  the game: movement, apples, golden mode, scoring; draws on the TFT
  *   4  Sound    10 ms  background music and sound effects on the buzzer
  *
  * Shared variables
  *   in_dir, input events        Input  -> System, Snake
  *   snake_active, snake_restart System -> Snake
- *   snake_over                  Snake  -> System (a stick press there means "play again")
+ *   snake_over                  Snake  -> System (the game-over box is up: System takes over)
  *   sys_paused                  System -> Snake, Sound (via sound_set_pause)
  *   song, effect, tempo         Snake  -> Sound (sound_music / sound_sfx / sound_tempo)
  *

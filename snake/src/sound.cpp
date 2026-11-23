@@ -4,11 +4,14 @@
 // ---- Note names (MIDI numbers) ----
 #define G4  67
 #define A4  69
+#define B4  71
 #define C4  60
+#define D4  62
 #define E4  64
 #define C5  72
 #define D5  74
 #define E5  76
+#define F5  77
 #define G5  79
 #define A5  81
 #define B5  83
@@ -29,6 +32,18 @@ const uint8_t SONG_SNAKE[] PROGMEM = {
 const uint8_t SONG_POWER[] PROGMEM = {          // golden-apple mode
     C6,1, G5,1, E5,1, G5,1, C6,1, E6,1, D6,1, C6,1,
     B5,1, G5,1, D5,1, G5,1, B5,1, D6,1, C6,2,
+    END
+};
+const uint8_t SONG_STAR_ALT[] PROGMEM = {       // Super Mario Starman theme
+    C5,2, C5,2, C5,2, D4,1, C5,2, C5,1, D4,1, C5,1, D4,1, C5,2, REST,1,
+    B4,2, B4,2, B4,2, C4,1, B4,2, B4,1, C4,1, B4,1, C4,1, B4,2, REST,1,
+    END
+};
+const uint8_t SONG_STAR[] PROGMEM = {           // star power: quick rising arpeggios
+    C5,1, E5,1, G5,1, C6,1, E6,1, C6,1, G5,1, E5,1,
+    D5,1, F5,1, A5,1, D6,1, A5,1, F5,1, D5,1, F5,1,
+    E5,1, G5,1, B5,1, E6,1, B5,1, G5,1, E5,1, G5,1,
+    F5,1, A5,1, C6,1, A5,1, G5,1, B5,1, D6,1, B5,1,
     END
 };
 // ---- Sound effects, 1 step = 40 ms ----

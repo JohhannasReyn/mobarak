@@ -5,6 +5,7 @@
 #define EE_MAGIC_ADDR ((uint8_t *)0)
 #define EE_MAGIC      0x5B              // change to wipe the table on the next boot
 #define EE_MUSIC_ADDR ((uint8_t *)1)   // 0 = off; anything else (an erased EEPROM reads 0xFF) = on
+#define EE_DRAW_ADDR  ((uint8_t *)15)  // 1 = on; anything else (0xFF when erased) = off
 #define EE_TABLE      2
 
 static uint16_t *slot(uint8_t game, uint8_t rank) {
@@ -17,6 +18,7 @@ void scores_init() {
             for (uint8_t r = 0; r < SCORE_SLOTS; r++)
                 eeprom_update_word(slot(g, r), 0);
         eeprom_update_byte(EE_MUSIC_ADDR, 1);
+        eeprom_update_byte(EE_DRAW_ADDR, 0);
         eeprom_update_byte(EE_MAGIC_ADDR, EE_MAGIC);
     }
 }
@@ -31,6 +33,14 @@ uint8_t setting_music() {
 
 void setting_music_set(uint8_t on) {
     eeprom_update_byte(EE_MUSIC_ADDR, on ? 1 : 0);
+}
+
+uint8_t setting_draw_touch() {
+    return eeprom_read_byte(EE_DRAW_ADDR) == 1;
+}
+
+void setting_draw_touch_set(uint8_t on) {
+    eeprom_update_byte(EE_DRAW_ADDR, on ? 1 : 0);
 }
 
 int8_t score_submit(uint8_t game, uint16_t score) {

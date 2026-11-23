@@ -1,7 +1,9 @@
 #pragma once
 #include <stdint.h>
 
-enum Directions { DIR_NONE = 0, DIR_UP, DIR_DOWN, DIR_LEFT, DIR_RIGHT };
+// Compass headings on the screen: north is the top edge, east the right.
+// The joystick's up/down/left/right map straight onto them.
+enum Directions { DIR_NONE = 0, DIR_NORTH, DIR_SOUTH, DIR_WEST, DIR_EAST };
 
 // Press events. They stay set until a task takes them with input_take().
 #define EV_RESET 0x01

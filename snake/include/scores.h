@@ -2,8 +2,9 @@
 #include <stdint.h>
 
 // Top-3 high-score table per game in the ATmega328P's EEPROM, kept
-// across power cycles, plus the music setting. Layout: magic byte at 0,
-// music setting at 1, then 3 x uint16 per game from 2.
+// across power cycles, plus the menu's settings. Layout: magic byte at 0,
+// music setting at 1, then 3 x uint16 per game from 2; the DRAW VISUAL
+// TOUCH setting at 15. The touch calibration lives at 16-25 (touch.cpp).
 #define SCORE_SLOTS 3
 
 void     scores_init();                               // formats the table on first boot
@@ -12,3 +13,5 @@ int8_t   score_submit(uint8_t game, uint16_t score);  // rank it landed at, or -
 
 uint8_t  setting_music();                             // 1 = music on
 void     setting_music_set(uint8_t on);
+uint8_t  setting_draw_touch();                        // 1 = the touch debug overlay on
+void     setting_draw_touch_set(uint8_t on);

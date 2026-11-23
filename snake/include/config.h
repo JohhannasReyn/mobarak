@@ -48,15 +48,23 @@
 #define TOUCH_ENABLED 1      // 0: build without touch (set this if T_* isn't wired)
 #define TOUCH_CS PD4         // D4
 
-// Calibration: hold the stick pressed while powering up to get the touch
-// test screen. Touch its two crosses and copy the RAW numbers here.
-// If RAW X follows your finger up and down instead of sideways, flip TOUCH_SWAP_XY.
+// Calibration happens on the screen: the touch setup comes up by itself
+// until it has been done once (hold the stick pressed while powering up to
+// redo it), and saves its result in EEPROM. The numbers below are only
+// used until then.
 #define TOUCH_SWAP_XY  1
-#define TOUCH_X_LEFT   300   // RAW X at the top-left cross     (screen x = 20)
-#define TOUCH_X_RIGHT  3800  // RAW X at the bottom-right cross (screen x = 459)
-#define TOUCH_Y_TOP    300   // RAW Y at the top-left cross     (screen y = 20)
-#define TOUCH_Y_BOTTOM 3800  // RAW Y at the bottom-right cross (screen y = 299)
-#define TOUCH_PRESSURE 300   // a touch counts once PRESSURE reads above this
+#define TOUCH_X_LEFT   300   // raw reading at screen x = 20
+#define TOUCH_X_RIGHT  3800  // raw reading at screen x = 459
+#define TOUCH_Y_TOP    300   // raw reading at screen y = 20
+#define TOUCH_Y_BOTTOM 3800  // raw reading at screen y = 299
+#define TOUCH_PRESSURE 300   // how hard a press must be to count (lower: lighter touches)
+
+// 1: build in the touch debug overlay, which draws where each tap registered
+// and the heading it asked for (N/E/S/W). It starts off; the title menu's
+// DRAW VISUAL TOUCH switches it on. 0: leave it out. See tapdebug.h.
+#ifndef TOUCH_DEBUG
+#define TOUCH_DEBUG 1
+#endif
 
 // ---- Buttons (PORTC, active LOW with internal pull-ups) ----
 #define BTN_RESET PC2        // A2: soft reset, restarts the game at any time

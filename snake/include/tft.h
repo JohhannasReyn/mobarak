@@ -36,3 +36,7 @@ void tft_text_center_P(int16_t y, const char *s, uint16_t fg, uint16_t bg, uint8
 void tft_number(int16_t x, int16_t y, uint16_t value, uint8_t digits, uint16_t fg, uint16_t bg, uint8_t scale);   // zero-padded
 uint16_t tft_text_width_P(const char *s, uint8_t scale);
 
+// Pixel art: w x h characters in PROGMEM, row after row. '.' is bg, '1'-'4'
+// are palette[0]-palette[3]. Drawn only if it fits on the screen whole.
+void tft_sprite_P(int16_t x, int16_t y, uint8_t w, uint8_t h, const char *art, const uint16_t *palette, uint16_t bg);
+

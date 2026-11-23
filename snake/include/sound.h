@@ -11,6 +11,7 @@
 
 extern const uint8_t SONG_SNAKE[] PROGMEM;
 extern const uint8_t SONG_POWER[] PROGMEM;
+extern const uint8_t SONG_STAR[] PROGMEM;    // star power: swap in your own notes here
 
 extern const uint8_t SFX_EAT[] PROGMEM;
 extern const uint8_t SFX_GOLD[] PROGMEM;
