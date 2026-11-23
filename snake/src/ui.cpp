@@ -7,9 +7,11 @@
 // What the status bar shows, so it can be drawn again after a pause
 static uint16_t hud_score = 0, hud_hi = 0;
 static uint8_t hud_gold = 0, hud_star = 0, hud_lives = 0;
+static uint8_t demo = 0;             // the demo: a banner instead of the numbers
 
 // The power slot: star power's seconds while it lasts, else golden mode's
 static void draw_power() {
+    if (demo) return;
     if (hud_star) {
         tft_text_P(HUD_GOLD_X, HUD_TEXT_Y, PSTR("STAR"), C_STAR_TEXT, C_BLACK, 2);
         tft_number(HUD_GOLD_X + 60, HUD_TEXT_Y, hud_star, 2, C_STAR_TEXT, C_BLACK, 2);
@@ -24,6 +26,11 @@ static void draw_power() {
 static void draw_hud() {
     tft_fill_rect(0, 0, TFT_W, HUD_H - 2, C_BLACK);
     tft_fill_rect(0, HUD_H - 2, TFT_W, 2, C_GRAY);
+    if (demo) {
+        tft_text_P(8, HUD_TEXT_Y, PSTR("DEMO"), C_YELLOW, C_BLACK, 2);
+        tft_text_P(196, HUD_TEXT_Y, PSTR("PRESS ANY BUTTON"), C_GRAY, C_BLACK, 2);
+        return;
+    }
     tft_text_P(8, HUD_TEXT_Y, PSTR("SCORE:"), C_WHITE, C_BLACK, 2);
     tft_number(HUD_SCORE_X, HUD_TEXT_Y, hud_score, 5, C_WHITE, C_BLACK, 2);
     tft_text_P(158, HUD_TEXT_Y, PSTR("LIVES:"), C_WHITE, C_BLACK, 2);
@@ -42,13 +49,17 @@ void ui_hud(uint16_t score, uint16_t hi, uint8_t lives) {
     draw_hud();
 }
 
+void ui_set_demo(uint8_t on) { demo = on; }
+
 void ui_hud_score(uint16_t score) {
     hud_score = score;
+    if (demo) return;
     tft_number(HUD_SCORE_X, HUD_TEXT_Y, score, 5, C_WHITE, C_BLACK, 2);
 }
 
 void ui_hud_lives(uint8_t lives) {
     hud_lives = lives;
+    if (demo) return;
     tft_number(HUD_LIVES_X, HUD_TEXT_Y, lives, 1, C_WHITE, C_BLACK, 2);
 }
 
@@ -79,5 +90,5 @@ void ui_game_over(uint8_t won, uint16_t score, int8_t rank) {
     tft_number(GO_SCORE_X, GO_Y + 64, score, 5, C_WHITE, C_BLACK, 2);
     if (rank == 0)     tft_text_center_P(GO_Y + 88, PSTR("NEW HIGH SCORE!"), C_YELLOW, C_BLACK, 2);
     else if (rank > 0) tft_text_center_P(GO_Y + 88, PSTR("TOP 3 SCORE!"), C_YELLOW, C_BLACK, 2);
-    tft_text_center_P(GO_Y + 112, PSTR("STICK OR TAP: MENU"), C_GRAY, C_BLACK, 2);
+    tft_text_center_P(GO_Y + 112, rank >= 0 ? PSTR("STICK OR TAP: INITIALS") : PSTR("STICK OR TAP: MENU"), C_GRAY, C_BLACK, 2);
 }

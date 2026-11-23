@@ -13,6 +13,7 @@ void ui_hud(uint16_t score, uint16_t hi, uint8_t lives);   // draw the whole sta
 void ui_hud_score(uint16_t score);
 void ui_hud_lives(uint8_t lives);
 void ui_hud_gold(uint8_t seconds);                  // golden-mode seconds left; 0 clears it
+void ui_set_demo(uint8_t on);                       // 1: the status bar says DEMO, and nothing else
 void ui_hud_star(uint8_t seconds);                  // star-power seconds left (shown first); 0 clears it
 void ui_pause_banner(uint8_t on);                   // on: PAUSED; off: the status bar again
 void ui_game_over(uint8_t won, uint16_t score, int8_t rank);

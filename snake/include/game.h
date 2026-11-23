@@ -7,10 +7,12 @@ enum Games { GAME_SNAKE = 0, GAME_COUNT };   // scores.cpp sizes its table from 
 extern uint8_t snake_active;      // 1 while Snake owns the screen (0 on the title screen)
 extern uint8_t snake_restart;     // System sets 1 to (re)start a game; Snake clears it
 extern uint8_t sys_paused;        // Snake freezes while this is set
+extern uint8_t snake_demo;        // 1: the title screen's demo; Snake steers itself, saves no score
 
 // ---- Snake task -> System task ----
 extern uint8_t snake_over;        // 1 while the game-over box is up: System takes over,
                                   // and goes back to the menu on a press or after 5 s
+extern int8_t  snake_rank;        // where the last score landed in the top 3 (0 = best), or -1
 
 // ---- Screen layout: a 32 px status bar, then the field ----
 #define HUD_H   32
@@ -50,14 +52,18 @@ struct SnakeData {
     uint16_t star_life;                // ticks the star stays on the board (0 = none)
     uint16_t star_timer;               // ticks of star power left
     uint8_t  hue, hue_wait, paint;     // star: rainbow phase, ticks in it, next segment to repaint
+    uint8_t  ax, ay;                   // apple cell
     uint8_t  lives;                    // the game ends when the last one is lost
     uint8_t  crash_timer;              // ticks left of the pause after a crash
+    uint8_t  flash_on, flash_i, flash_wait;   // crash: body white or not, next segment, ticks waited
+    uint8_t  ready_timer;              // ticks left of the 3-2-1 countdown
 };
 extern SnakeData S;
 
 // ---- Task tick functions and their states ----
-enum System_States { SYS_INIT, SYS_TITLE, SYS_PLAY, SYS_PAUSE, SYS_TOUCH_SETUP, SYS_SCORES, SYS_OVER };
-enum Snake_States  { SN_OFF, SN_PLAY, SN_CRASH, SN_OVER };
+enum System_States { SYS_INIT, SYS_TITLE, SYS_PLAY, SYS_PAUSE, SYS_TOUCH_SETUP, SYS_SCORES, SYS_OVER,
+                     SYS_DEMO, SYS_NAME };
+enum Snake_States  { SN_OFF, SN_PLAY, SN_CRASH, SN_OVER, SN_READY };
 
 int TickFct_System(int state);
 int TickFct_Snake(int state);

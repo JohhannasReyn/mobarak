@@ -52,6 +52,8 @@ const uint8_t SFX_GOLD[]    PROGMEM = { G5,1, REST,1, G5,1, END };
 const uint8_t SFX_POWERUP[] PROGMEM = { C5,1, E5,1, G5,1, C6,1, E6,2, END };
 const uint8_t SFX_OVER[]    PROGMEM = { C5,3, G4,3, E4,3, C4,6, END };
 const uint8_t SFX_CRASH[]   PROGMEM = { E5,2, C5,2, G4,4, END };
+const uint8_t SFX_COUNT[]   PROGMEM = { C5,3, END };              // 3, 2, 1...
+const uint8_t SFX_GO[]      PROGMEM = { C6,6, END };              // ...go
 const uint8_t SFX_WIN[]     PROGMEM = { C5,2, E5,2, G5,2, C6,6, END };
 
 #define SFX_STEP_MS 40
@@ -76,14 +78,23 @@ static uint8_t  s_note = 0;
 static uint16_t s_len = 0;
 static uint8_t  tempo = 100;
 static uint8_t  muted = 0, paused = 0;
-static uint8_t  music_on = 1;        // the title menu's MUSIC setting
+static uint8_t  music_on = 1;        // the title menu's MUSIC VOL: not muted
+static uint8_t  sfx_on = 1;          // and its FX VOL
+static uint8_t  music_vol = 10, sfx_vol = 10;   // 1-10
+static uint8_t  preview_vol = 0;     // the menu's blip at a new volume (0: none playing)
+static uint8_t  playing_vol = 0;     // volume on the buzzer right now
 static uint8_t  playing_note = 0;    // note on the buzzer right now
 static uint16_t playing_hz = 0;
 
 void sound_music(const uint8_t *song) { music = music_on ? song : 0; mpos = music; m_left = 0; }
 void sound_music_enable(uint8_t on) { music_on = on; if (!on) { music = 0; mpos = 0; } }
 uint8_t sound_music_enabled() { return music_on; }
-void sound_sfx(const uint8_t *effect) { sfx = effect; s_left = 0; }
+void sound_sfx(const uint8_t *effect) { if (sfx_on) { sfx = effect; s_left = 0; preview_vol = 0; } }
+void sound_music_volume(uint8_t v) { music_vol = v; }
+void sound_sfx_volume(uint8_t v) { sfx_vol = v; }
+void sound_preview(uint8_t v) { sfx = SFX_EAT; s_left = 0; preview_vol = v; }
+void sound_sfx_enable(uint8_t on) { sfx_on = on; if (!on) sfx = 0; }
+uint8_t sound_sfx_enabled() { return sfx_on; }
 void sound_tempo(uint8_t ms) { tempo = ms < 30 ? 30 : ms; }
 void sound_set_mute(uint8_t on) { muted = on; }
 void sound_set_pause(uint8_t on) { paused = on; }
@@ -98,28 +109,39 @@ static uint16_t note_hz(uint8_t note) {
     return pgm_read_word(&octave7[note % 12]) >> (7 - octave);
 }
 
+// Volume: a buzzer pin is only ever on or off, so loudness comes from how
+// long each pulse stays on. The strength of the note goes about as
+// sin(pi x duty), so these duties (out of 256) make each step about 2 dB,
+// from 4 % at 1 up to 50 % (as loud as it gets) at 10.
+static const uint8_t DUTY[11] PROGMEM = { 0, 10, 13, 16, 21, 26, 33, 43, 56, 75, 128 };
+
 static void buzzer_off() {
     TCCR2A = 0;                                 // release OC2B
     TCCR2B = 0;
     PORTD &= ~(1 << PD3);
     playing_note = 0;
+    playing_vol = 0;
     playing_hz = 0;
 }
 
-static void buzzer_note(uint8_t note) {
-    if (note == 0) { buzzer_off(); return; }
-    if (note == playing_note) return;           // already sounding: don't restart the timer
+// Timer2 in fast PWM with TOP = OCR2A: the period (OCR2A + 1 counts) sets
+// the pitch, and OC2B stays high for OCR2B + 1 counts of it: the volume.
+static void buzzer_note(uint8_t note, uint8_t vol) {
+    if (note == 0 || vol == 0) { buzzer_off(); return; }
+    if (note == playing_note && vol == playing_vol) return;   // already sounding: leave the timer be
     const uint16_t hz = note_hz(note);
     for (uint8_t i = 0; i < 7; i++) {
-        const uint32_t top = F_CPU / (2UL * pgm_read_word(&prescalers[i]) * hz) - 1;
+        const uint32_t top = F_CPU / ((uint32_t)pgm_read_word(&prescalers[i]) * hz) - 1;
         if (top <= 255) {
+            const uint8_t on = (uint16_t)(top + 1) * pgm_read_byte(&DUTY[vol]) / 256;
             TCCR2B = 0;
             TCNT2  = 0;
-            OCR2A  = (uint8_t)top;              // CTC top: sets the frequency
-            OCR2B  = 0;
-            TCCR2A = (1 << COM2B0) | (1 << WGM21);   // toggle OC2B on match, CTC
-            TCCR2B = i + 1;                     // CS22:0 = prescaler index + 1
+            OCR2A  = (uint8_t)top;
+            OCR2B  = on ? on - 1 : 0;
+            TCCR2A = (1 << COM2B1) | (1 << WGM21) | (1 << WGM20);   // OC2B high from BOTTOM to the match
+            TCCR2B = (1 << WGM22) | (i + 1);    // CS22:0 = prescaler index + 1
             playing_note = note;
+            playing_vol = vol;
             playing_hz = hz;
             return;
         }
@@ -134,7 +156,7 @@ void sound_init() {
 
 // Advance one track by TICK_MS. Returns 0 when a one-shot track ends.
 static uint8_t advance(const uint8_t **pos, uint16_t *left, uint8_t *note, uint16_t *len,
-                       uint16_t step_ms, const uint8_t *loop_start) {
+                       uint16_t step_ms, const uint8_t *loop_start, uint8_t vol) {
     if (*left == 0) {
         uint8_t n = pgm_read_byte(*pos);
         if (n == END) {
@@ -149,7 +171,7 @@ static uint8_t advance(const uint8_t **pos, uint16_t *left, uint8_t *note, uint1
     }
     // Leave a short gap before the next note so repeated notes stay distinct
     if (*left <= GAP_MS && *len > 2 * GAP_MS) buzzer_off();
-    else                                      buzzer_note(*note);
+    else                                      buzzer_note(*note, vol);
     *left = *left > TICK_MS ? *left - TICK_MS : 0;
     return 1;
 }
@@ -180,13 +202,14 @@ int TickFct_Sound(int state) {
             if (playing_note) buzzer_off();
             break;
         case SND_SFX:
-            if (!advance(&sfx, &s_left, &s_note, &s_len, SFX_STEP_MS, 0)) {
+            if (!advance(&sfx, &s_left, &s_note, &s_len, SFX_STEP_MS, 0, preview_vol ? preview_vol : sfx_vol)) {
                 sfx = 0;
+                preview_vol = 0;
                 buzzer_off();
             }
             break;
         case SND_MUSIC:
-            advance(&mpos, &m_left, &m_note, &m_len, tempo, music);
+            advance(&mpos, &m_left, &m_note, &m_len, tempo, music, music_vol);
             break;
         default:
             break;

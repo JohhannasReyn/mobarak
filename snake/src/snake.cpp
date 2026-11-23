@@ -22,9 +22,11 @@
 //   snake crashes only if its head is on its own body right then; a
 //   crossing anywhere else untangles as the tail moves on.
 //   Hitting a wall (outside golden mode and star power) or yourself costs
-//   a life: the snake stops for a second, then starts over from the left
-//   (the score stays). Losing the third life ends the game.
+//   a life: the snake stops for a second with its body flashing, then
+//   starts over from the left (the score stays). Losing the third life
+//   ends the game. A 3-2-1 countdown comes before every start.
 //   Reach length 100 to win.
+//   In the title screen's demo the snake steers itself (autopilot()).
 // =====================================================================
 
 #define START_LEN   3
@@ -40,6 +42,9 @@
 #define START_LIVES 3
 #define CRASH_TIME  100              // the snake stays crashed on screen for 1 s
 #define POWER_TIME  1000             // golden mode lasts 10 s
+#define READY_STEP  60               // each number of the 3-2-1 countdown shows 0.6 s
+#define FLASH_TICKS 15               // a crashed body flips between white and its color every 150 ms
+#define FLASH_SEGS  8                // ...redrawn 8 segments a tick, from the neck back
 
 #define C_BODY    RGB565(  0, 170,   0)
 #define C_HEAD    RGB565(120, 255, 120)
@@ -101,6 +106,7 @@ static const uint16_t STAR_COLORS[4]  = { C_STARY,  C_STARO, C_STARY, C_STARY };
 
 SnakeData S;
 uint8_t snake_over = 0;
+int8_t  snake_rank = -1;
 
 static const int8_t DX[5]  = { 0,  0, 0, -1, 1 };          // indexed by DIR_*
 static const int8_t DY[5]  = { 0, -1, 1,  0, 0 };
@@ -242,8 +248,7 @@ static void spawn_snake() {
     S.dir = S.next_dir = DIR_EAST;
     S.step_count = 0;
     repaint_snake();
-    uint8_t fx, fy;
-    if (apple_lost) place(FOOD, &fx, &fy);
+    if (apple_lost) place(FOOD, &S.ax, &S.ay);
 }
 
 static void start() {
@@ -257,35 +262,73 @@ static void start() {
 
     S.step_ticks = START_STEP;
     spawn_snake();
-    uint8_t fx, fy;
-    place(FOOD, &fx, &fy);
-    sound_music(SONG_SNAKE);
-    set_tempo();
+    place(FOOD, &S.ax, &S.ay);
+}
+
+// ---- The 3-2-1 countdown, before every start: a big number in the middle ----
+#define READY_X (TFT_W / 2 - 15)                     // the digit: 5 x 7 font at scale 6
+#define READY_Y (FIELD_Y + (TFT_H - FIELD_Y) / 2 - 21)
+
+static void ready_show(uint8_t n) {
+    tft_char(READY_X, READY_Y, '0' + n, C_WHITE, C_BLACK, 6);
+    sound_sfx(SFX_COUNT);
+}
+
+static void ready_clear() {                          // put back whatever the number covered
+    for (uint8_t y = (READY_Y - FIELD_Y) / CELL; y <= (READY_Y + 47 - FIELD_Y) / CELL; y++)
+        for (uint8_t x = READY_X / CELL; x <= (READY_X + 35) / CELL; x++) snake_redraw_cell(x, y);
+}
+
+static int get_ready() {
+    S.ready_timer = 3 * READY_STEP;
+    ready_show(3);
+    return SN_READY;
 }
 
 static int finish(uint8_t won) {
     tapdbg_erase();                // before the box goes up, or the wipe would draw over it
     sound_music(0);
+    snake_over = 1;                // System takes it from here
+    if (snake_demo) { snake_rank = -1; return SN_OVER; }   // the demo keeps no score
     const int8_t rank = score_submit(GAME_SNAKE, S.score);
+    snake_rank = rank;
     ui_game_over(won, S.score, rank);
     sound_sfx(won ? SFX_WIN : SFX_OVER);           // after the panel, so the jingle isn't stretched by the draw
     input_clear();                 // a press from before the crash doesn't count on the box
-    snake_over = 1;                // System takes it from here
     return SN_OVER;
 }
 
-// A crash costs a life. The last life ends the game; otherwise the snake
-// freezes for a second with a red head, then respawn() starts it over.
+// A crash costs a life. The snake freezes for a second with a red head
+// and its body flashing; then respawn() starts it over, or with no lives
+// left, the game ends.
 static int crash() {
     tapdbg_erase();                // before the head turns red
     S.lives--;
     ui_hud_lives(S.lives);         // 0 too: the status bar shouldn't claim a life is left
-    if (S.lives == 0) return finish(0);
     tft_fill_rect(px(S.hx) + 1, py(S.hy) + 1, CELL - 2, CELL - 2, C_CRASH);
     sound_music(0);
     sound_sfx(SFX_CRASH);
     S.crash_timer = CRASH_TIME;
+    S.flash_on = 1;                // white first
+    S.flash_i = 0;
+    S.flash_wait = 0;
     return SN_CRASH;
+}
+
+// The crash pause: the body flips between white and its own color. Each
+// flip is drawn a few segments a tick, from the neck back to the tail, so
+// a long snake never stalls the scheduler; the head stays red.
+static void crash_flash() {
+    if (S.flash_i + 1 >= S.length) {               // the whole body is done
+        if (++S.flash_wait < FLASH_TICKS) return;
+        S.flash_wait = 0;
+        S.flash_i = 0;
+        S.flash_on ^= 1;
+    }
+    for (uint8_t k = 0; k < FLASH_SEGS && S.flash_i + 1 < S.length; k++) {
+        const uint8_t i = ring(S.length - 2 - S.flash_i++);
+        tft_fill_rect(px(S.bx[i]) + 1, py(S.by[i]) + 1, CELL - 2, CELL - 2, S.flash_on ? C_WHITE : seg_color(i));
+    }
 }
 
 // After the crash pause: erase the old snake, end golden mode, new snake.
@@ -299,8 +342,6 @@ static void respawn() {
     if (golden()) { S.power_timer = 0; ui_hud_gold(0); }
     spawn_snake();
     input_clear();                 // a flick made during the crash doesn't steer the new snake
-    sound_music(SONG_SNAKE);
-    set_tempo();
 }
 
 // Star power over: back to green (or orange) and the usual song. The head
@@ -356,6 +397,37 @@ static void read_steering() {
     else if (ev & EV_RIGHT) want = DIR_EAST;
     else                    want = in_dir;
     if (want != DIR_NONE && want != OPP[S.dir]) S.next_dir = want;
+}
+
+// The demo's driver. Of the ways the snake can go, it takes a safe one that
+// gets closest to the best thing on the board (a star, then a golden apple,
+// then the apple), and avoids cells with no way on. Greedy, so it does crash
+// in the end, which shows off the crash and the countdown too.
+static uint8_t free_cell(int8_t x, int8_t y) {
+    if (x < 0 || x >= SN_COLS || y < 0 || y >= SN_ROWS) {
+        if (!golden() && !starred()) return 0;
+        x = (x + SN_COLS) % SN_COLS;
+        y = (y + SN_ROWS) % SN_ROWS;
+    }
+    const uint8_t v = S.grid[y][x];
+    return !is_snake(v) || starred() || (x == S.tx && y == S.ty && v == 1 && S.grow == 0);
+}
+
+static void autopilot() {
+    uint8_t gx = S.ax, gy = S.ay;
+    if (S.star_life)      { gx = S.starx; gy = S.stary; }
+    else if (S.gold_timer) { gx = S.gx; gy = S.gy; }
+    int16_t best = 0x7FFF;
+    for (uint8_t d = DIR_NORTH; d <= DIR_EAST; d++) {
+        if (d == OPP[S.dir]) continue;
+        const int8_t nx = S.hx + DX[d], ny = S.hy + DY[d];
+        if (!free_cell(nx, ny)) continue;
+        uint8_t room = 0;                                 // ways on from there
+        for (uint8_t e = DIR_NORTH; e <= DIR_EAST; e++) room += free_cell(nx + DX[e], ny + DY[e]);
+        int16_t cost = (nx > gx ? nx - gx : gx - nx) + (ny > gy ? ny - gy : gy - ny);
+        if (room <= 1) cost += 100;                       // a dead end, or nearly
+        if (cost < best) { best = cost; S.next_dir = d; }
+    }
 }
 
 // One move. Returns the next state.
@@ -433,8 +505,7 @@ static int step() {
     }
     if (S.length >= WIN_LENGTH) return finish(1);
     if (target == FOOD) {
-        uint8_t fx, fy;
-        if (!place(FOOD, &fx, &fy)) return finish(1);     // no room left: board cleared
+        if (!place(FOOD, &S.ax, &S.ay)) return finish(1); // no room left: board cleared
         if (S.eaten % GOLD_EVERY == 0 && S.gold_timer == 0 && !golden()) {
             if (place(GOLD, &S.gx, &S.gy)) { S.gold_timer = GOLD_LIFE; sound_sfx(SFX_GOLD); }
         }
@@ -490,12 +561,13 @@ static int tick_timers() {
 
 // =====================================================================
 // Snake task, period 10 ms
-//   SN_OFF  --(System sets snake_restart)--> SN_PLAY (draw a fresh game)
-//   SN_PLAY --(wall / self, lives left)--> SN_CRASH
-//           --(wall / self, last life)--> SN_OVER   --(length 100)--> SN_OVER (win)
-//           --(star wears off with the head on the body)--> SN_CRASH (or SN_OVER)
-//   SN_CRASH --(1 s later: new snake)--> SN_PLAY
-//   any     --(System sets snake_restart: RESET button)--> SN_PLAY
+//   SN_OFF   --(System sets snake_restart)--> SN_READY (draw a fresh game)
+//   SN_READY --(3-2-1 done, 1.8 s)--> SN_PLAY
+//   SN_PLAY  --(wall / self, or the star wearing off with the head on the body)--> SN_CRASH
+//            --(length 100)--> SN_OVER (win)
+//   SN_CRASH --(1 s later, lives left: new snake)--> SN_READY
+//            --(1 s later, no lives left)--> SN_OVER
+//   any      --(System sets snake_restart: RESET button)--> SN_READY
 //   any     --(System goes back to the title screen)--> SN_OFF
 // =====================================================================
 int TickFct_Snake(int state) {
@@ -504,13 +576,28 @@ int TickFct_Snake(int state) {
     if (snake_restart) {
         snake_restart = 0;
         start();
-        return SN_PLAY;
+        return get_ready();
     }
 
     switch (state) {
+        case SN_READY:
+            if (sys_paused) break;
+            if (!snake_demo) read_steering();           // a turn picked now is taken on GO
+            tapdbg_tick();
+            if (--S.ready_timer == 0) {
+                ready_clear();
+                sound_sfx(SFX_GO);
+                sound_music(SONG_SNAKE);
+                set_tempo();
+                state = SN_PLAY;
+            } else if (S.ready_timer % READY_STEP == 0) {
+                ready_show(S.ready_timer / READY_STEP);
+            }
+            break;
         case SN_PLAY: {
             if (sys_paused) break;
-            read_steering();
+            if (snake_demo) autopilot();
+            else            read_steering();
             tapdbg_tick();
             state = tick_timers();
             if (state != SN_PLAY) break;
@@ -525,9 +612,14 @@ int TickFct_Snake(int state) {
         }
         case SN_CRASH:
             if (sys_paused) break;
+            crash_flash();
             if (--S.crash_timer == 0) {
-                respawn();
-                state = SN_PLAY;
+                if (S.lives == 0) {
+                    state = finish(0);
+                } else {
+                    respawn();
+                    state = get_ready();
+                }
             }
             break;
         case SN_OVER:                     // the box stays up until System leaves it
