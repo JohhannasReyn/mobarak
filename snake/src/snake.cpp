@@ -114,8 +114,8 @@ static const uint8_t OPP[5] = { DIR_NONE, DIR_SOUTH, DIR_NORTH, DIR_EAST, DIR_WE
 
 static int16_t px(uint8_t cx) { return cx * CELL; }
 static int16_t py(uint8_t cy) { return FIELD_Y + cy * CELL; }
-static uint8_t golden()  { return S.power_timer > 0; }
-static uint8_t starred() { return S.star_timer > 0; }
+static uint8_t golden()  { return gold_running(); }    // running, not waiting on a star
+static uint8_t starred() { return star_running(); }
 static uint8_t is_snake(uint8_t v) { return v != EMPTY && v <= SEG_MAX; }
 
 // ---- The body: a ring of cells, tail first ----
@@ -229,6 +229,18 @@ static uint8_t place(uint8_t what, uint8_t *ox, uint8_t *oy) {
 // Music speeds up with the snake; a star doubles it, like the snake
 static void set_tempo() { sound_tempo(starred() ? S.step_ticks * 7 / 2 : S.step_ticks * 7); }
 
+// Show whichever power runs now, or none: the snake's colors, the song and
+// its tempo, and the seconds in the status bar. Called whenever one starts
+// or ends, so a power picking up after a wait looks just like a new one.
+static void show_power() {
+    repaint_snake();
+    if (starred()) S.paint = S.length;                // the rainbow flows again in 80 ms
+    sound_music(starred() ? SONG_STAR : golden() ? SONG_POWER : SONG_SNAKE);
+    set_tempo();
+    ui_hud_star(starred() ? (S.star_timer + 99) / 100 : 0);
+    ui_hud_gold(golden() ? (S.power_timer + 99) / 100 : 0);
+}
+
 // A new snake: three segments left of center, heading right. Used at the
 // start of a game and after each lost life. An apple sitting where the
 // snake appears is moved somewhere else.
@@ -331,27 +343,28 @@ static void crash_flash() {
     }
 }
 
-// After the crash pause: erase the old snake, end golden mode, new snake.
-// Score, speed and the apples on the board stay as they were.
+// After the crash pause: erase the old snake, end golden mode (and a star
+// waiting behind it), new snake. Score, speed and the apples on the board
+// stay as they were.
 static void respawn() {
     for (uint8_t j = 0; j < S.length; j++) {
         const uint8_t i = ring(j);
         S.grid[S.by[i]][S.bx[i]] = EMPTY;
         draw_empty(S.bx[i], S.by[i]);
     }
-    if (golden()) { S.power_timer = 0; ui_hud_gold(0); }
+    S.power_timer = 0;
+    S.star_timer = 0;
+    ui_hud_gold(0);
+    ui_hud_star(0);
     spawn_snake();
     input_clear();                 // a flick made during the crash doesn't steer the new snake
 }
 
-// Star power over: back to green (or orange) and the usual song. The head
-// on its own body right now is a crash; anywhere else the snake may still
-// cross itself, and that untangles as the tail moves on.
+// Star power over: back to green, or golden mode picks up where it waited.
+// The head on its own body right now is a crash; anywhere else the snake
+// may still cross itself, and that untangles as the tail moves on.
 static int end_star() {
-    ui_hud_star(0);
-    repaint_snake();
-    sound_music(golden() ? SONG_POWER : SONG_SNAKE);
-    set_tempo();
+    show_power();
     if (S.grid[S.hy][S.hx] > 1) return crash();
     return SN_PLAY;
 }
@@ -463,7 +476,7 @@ static int step() {
         S.grow++;
         S.gold_timer = 0;
         S.power_timer = POWER_TIME;
-        if (!starred()) sound_music(SONG_POWER);          // a star's song plays on while it lasts
+        S.star_top = 0;                                   // a star running now waits for golden mode
         sound_sfx(SFX_POWERUP);
         ui_hud_score(S.score);
     } else if (target == STAR) {
@@ -471,10 +484,9 @@ static int step() {
         S.grow++;
         S.star_life = 0;
         S.star_timer = STAR_TIME;
+        S.star_top = 1;                                   // golden mode running now waits for the star
         S.hue = 0;
         S.hue_wait = 0;
-        sound_music(SONG_STAR);
-        set_tempo();
         sound_sfx(SFX_POWERUP);
         ui_hud_score(S.score);
     }
@@ -494,22 +506,14 @@ static int step() {
     push_head(nx, ny);
     draw_head();
 
-    if (target == GOLD) {
-        if (!starred()) repaint_snake();                  // orange (a star keeps its rainbow)
-        ui_hud_gold(POWER_TIME / 100);
-    }
-    if (target == STAR) {
-        repaint_snake();                                  // rainbow
-        S.paint = S.length;                               // the first new phase in 80 ms
-        ui_hud_star(STAR_TIME / 100);
-    }
+    if (target == GOLD || target == STAR) show_power();   // orange or rainbow, its song, its seconds
     if (S.length >= WIN_LENGTH) return finish(1);
     if (target == FOOD) {
         if (!place(FOOD, &S.ax, &S.ay)) return finish(1); // no room left: board cleared
-        if (S.eaten % GOLD_EVERY == 0 && S.gold_timer == 0 && !golden()) {
+        if (S.eaten % GOLD_EVERY == 0 && S.gold_timer == 0 && S.power_timer == 0) {
             if (place(GOLD, &S.gx, &S.gy)) { S.gold_timer = GOLD_LIFE; sound_sfx(SFX_GOLD); }
         }
-        if (S.eaten % STAR_EVERY == 0 && S.star_life == 0 && !starred()) {
+        if (S.eaten % STAR_EVERY == 0 && S.star_life == 0 && S.star_timer == 0) {
             if (place(STAR, &S.starx, &S.stary)) { S.star_life = STAR_LIFE; sound_sfx(SFX_GOLD); }
         }
     }
@@ -517,8 +521,9 @@ static int step() {
 }
 
 // Timers that run every tick: the golden apple's and the star's time on
-// the board, golden mode, star power. Returns the next state: the star
-// wearing off can end in a crash.
+// the board, and the power that's running (golden mode or star power; the
+// other one, if held, waits). Returns the next state: the star wearing off
+// can end in a crash.
 static int tick_timers() {
     if (S.gold_timer > 0) {
         S.gold_timer--;
@@ -538,22 +543,14 @@ static int tick_timers() {
             draw_empty(S.starx, S.stary);
         }
     }
-    if (S.power_timer > 0) {
-        S.power_timer--;
-        if (S.power_timer == 0) {
-            ui_hud_gold(0);
-            if (!starred()) {                              // with a star on, its colors and song stay
-                repaint_snake();                           // back to green
-                sound_music(SONG_SNAKE);
-                set_tempo();
-            }
+    if (golden()) {
+        if (--S.power_timer == 0) {
+            show_power();                                  // back to green, or a waiting star picks up
         } else if (S.power_timer % 100 == 0) {
             ui_hud_gold(S.power_timer / 100);              // seconds left
         }
-    }
-    if (S.star_timer > 0) {
-        S.star_timer--;
-        if (S.star_timer == 0) return end_star();
+    } else if (starred()) {
+        if (--S.star_timer == 0) return end_star();
         if (S.star_timer % 100 == 0) ui_hud_star(S.star_timer / 100);
     }
     return SN_PLAY;

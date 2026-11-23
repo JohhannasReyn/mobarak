@@ -51,6 +51,7 @@ struct SnakeData {
     uint8_t  starx, stary;             // star cell
     uint16_t star_life;                // ticks the star stays on the board (0 = none)
     uint16_t star_timer;               // ticks of star power left
+    uint8_t  star_top;                 // both powers held: 1 = the star came last (it runs, golden mode waits)
     uint8_t  hue, hue_wait, paint;     // star: rainbow phase, ticks in it, next segment to repaint
     uint8_t  ax, ay;                   // apple cell
     uint8_t  lives;                    // the game ends when the last one is lost
@@ -59,6 +60,12 @@ struct SnakeData {
     uint8_t  ready_timer;              // ticks left of the 3-2-1 countdown
 };
 extern SnakeData S;
+
+// Golden mode and star power run one at a time. With both held, the newer
+// one runs; the other waits, its seconds frozen and its effects off, and
+// picks up where it stopped once the newer one ends.
+static inline uint8_t gold_running() { return S.power_timer && !(S.star_timer && S.star_top); }
+static inline uint8_t star_running() { return S.star_timer && !(S.power_timer && !S.star_top); }
 
 // ---- Task tick functions and their states ----
 enum System_States { SYS_INIT, SYS_TITLE, SYS_PLAY, SYS_PAUSE, SYS_TOUCH_SETUP, SYS_SCORES, SYS_OVER,
