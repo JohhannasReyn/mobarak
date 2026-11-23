@@ -266,7 +266,7 @@ static uint8_t name_tick() {
 
 // ---- Demo: after 20 s untouched on the title screen, the snake plays itself ----
 #define DEMO_IDLE 1000                // 20 s of 20 ms ticks
-#define DEMO_TIME 2000                // 40 s at most
+#define DEMO_TIME 10000                // 200 s of 20 ms ticks, then back to the title screen
 static uint16_t idle_ticks, demo_ticks;
 
 // ---- Game over: the box Snake drew stays up until a press, or 5 s ----

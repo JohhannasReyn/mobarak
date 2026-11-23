@@ -29,17 +29,17 @@ const uint8_t SONG_SNAKE[] PROGMEM = {
     D5,2, C5,2, A4,2, G4,2, A4,4, REST,4,
     END
 };
-// const uint8_t SONG_POWER[] PROGMEM = {          // golden-apple mode
-//     C6,1, G5,1, E5,1, G5,1, C6,1, E6,1, D6,1, C6,1,
-//     B5,1, G5,1, D5,1, G5,1, B5,1, D6,1, C6,2,
-//     END
-// };
-const uint8_t SONG_POWER[] PROGMEM = {       // Super Mario Starman theme
+const uint8_t SONG_POWER[] PROGMEM = {          // golden-apple mode
+    C6,1, G5,1, E5,1, G5,1, C6,1, E6,1, D6,1, C6,1,
+    B5,1, G5,1, D5,1, G5,1, B5,1, D6,1, C6,2,
+    END
+};
+const uint8_t SONG_STAR[] PROGMEM = {       // Super Mario Starman theme
     C5,2, C5,2, C5,2, D4,1, C5,2, C5,1, D4,1, C5,1, D4,1, C5,2, REST,1,
     B4,2, B4,2, B4,2, C4,1, B4,2, B4,1, C4,1, B4,1, C4,1, B4,2, REST,1,
     END
 };
-const uint8_t SONG_STAR[] PROGMEM = {           // star power: quick rising arpeggios
+const uint8_t SONG_STAR_ALT[] PROGMEM = {           // star power: quick rising arpeggios
     C5,1, E5,1, G5,1, C6,1, E6,1, C6,1, G5,1, E5,1,
     D5,1, F5,1, A5,1, D6,1, A5,1, F5,1, D5,1, F5,1,
     E5,1, G5,1, B5,1, E6,1, B5,1, G5,1, E5,1, G5,1,
